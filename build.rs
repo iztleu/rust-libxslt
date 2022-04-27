@@ -1,28 +1,58 @@
-extern crate pkg_config;
-use pkg_config::find_library;
-
 fn main() {
-  if find_library("libxslt").is_err() {
-    panic!("Could not find libxslt using pkg-config");
-  }
-  // // The bindgen::Builder is the main entry point
-  // // to bindgen, and lets you build up options for
-  // // the resulting bindings.
-  // let bindings = bindgen::Builder::default()
-  //       // The input header we would like to generate
-  //       // bindings for.
-  //       .header("wrapper.h")
-  //       // Homebrew location of libxslt headers.
-  //       .clang_arg("-I/usr/include/libxml2")
-  //       .clang_arg("-I/usr/include/libxslt")
-  //       // Finish the builder and generate the bindings.
-  //       .generate()
-  //       // Unwrap the Result and panic on failure.
-  //       .expect("Unable to generate bindings");
+  if let Ok(ref s) = std::env::var("LIBXSLT") {
+    let p = std::path::Path::new(s);
+    let fname = std::path::Path::new(p.file_name().expect("no file name in LIBXSLT env"));
+    assert!(p.is_file());
+    println!(
+      "cargo:rustc-link-lib={}",
+      fname
+          .file_stem()
+          .unwrap()
+          .to_string_lossy()
+          .strip_prefix("lib")
+          .unwrap()
+    );
+    println!(
+      "cargo:rustc-link-search={}",
+      p.parent()
+          .expect("no library path in LIBXSLT env")
+          .to_string_lossy()
+    );
+  } else {
+    #[cfg(any(target_family = "unix", target_os = "macos"))]
+    {
+      if pkg_config_dep::find() {
+        return;
+      }
+    }
 
-  // // Write the bindings to the $OUT_DIR/bindings.rs file.
-  // let out_path = PathBuf::from("src");
-  // bindings
-  //   .write_to_file(out_path.join("bindings.rs"))
-  //   .expect("Couldn't write bindings!");
+    #[cfg(windows)]
+    {
+      if vcpkg_dep::find() {
+        return;
+      }
+    }
+
+    panic!("Could not find libxslt.")
+  }
+}
+
+#[cfg(any(target_family = "unix", target_os = "macos"))]
+mod pkg_config_dep {
+  pub fn find() -> bool {
+    if pkg_config::find_library("libxml-2.0").is_ok() {
+      return true;
+    }
+    false
+  }
+}
+
+#[cfg(target_family = "windows")]
+mod vcpkg_dep {
+  pub fn find() -> bool {
+    if vcpkg::find_package("libxml2").is_ok() {
+      return true;
+    }
+    false
+  }
 }
