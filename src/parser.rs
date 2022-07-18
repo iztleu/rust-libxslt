@@ -45,7 +45,10 @@ pub fn parse_bytes(file_string_as_bytes: Vec<u8>, url: &str) -> Result<Styleshee
         let xml = xmlReadMemory(file, xsl_file_string_len, url, std::ptr::null::<libc::c_char>(), 0);
 
         let ptr = xsltParseStylesheetDoc(xml);
-
-        Ok(Stylesheet { ptr })
+        if ptr.is_null() {
+            Err(format!("Failed to parse stylesheet file from bytes"))
+        } else {
+            Ok(Stylesheet { ptr })
+        }
     }
 }
